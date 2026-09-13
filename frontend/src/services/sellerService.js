@@ -1,12 +1,7 @@
-// Seller applications + seller-uploaded products storage.
-// LocalStorage backed. Backend-swap-ready (same shape as authService).
+// Backend-backed seller service (applications, products, withdrawals).
+// Keeps the same call signatures and static exports the UI relies on.
+import api from './apiClient';
 
-const APPS_KEY = 'shahlance_seller_applications';
-const PRODS_KEY = 'shahlance_seller_products';
-const WITHDRAWALS_KEY = 'shahlance_withdrawals';
-
-function read(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } }
-function write(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 export const SELLER_TYPES = [
@@ -19,124 +14,81 @@ export const SELLER_TYPES = [
 
 export const sellerService = {
   // ---------- Applications ----------
-  async submitApplication(userId, data) {
-    await sleep(500);
-    const apps = read(APPS_KEY);
-    // one pending/approved application per (user, sellerType)
-    const existing = apps.find((a) => a.userId === userId && a.sellerType === data.sellerType && a.status !== 'rejected');
-    if (existing) throw new Error('You already have a pending or approved application for this seller type.');
-    const app = {
-      id: `app_${Math.random().toString(36).slice(2, 10)}`,
-      userId,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      ...data,
-    };
-    apps.unshift(app);
-    write(APPS_KEY, apps);
-    return app;
+  async submitApplication(_userId, data) {
+    const { sellerType, ...rest } = data;
+    const { data: res } = await api.post('/seller/applications', { sellerType, data: rest });
+    return res;
   },
   async listApplications({ status } = {}) {
-    await sleep(200);
-    let apps = read(APPS_KEY);
-    if (status) apps = apps.filter((a) => a.status === status);
-    return apps;
+    const { data } = await api.get('/seller/applications', { params: status ? { status } : {} });
+    return data;
   },
-  async listUserApplications(userId) {
-    await sleep(200);
-    return read(APPS_KEY).filter((a) => a.userId === userId);
+  async listUserApplications(_userId) {
+    const { data } = await api.get('/seller/applications/mine');
+    return data;
   },
-  async decideApplication(appId, action /* 'approve' | 'reject' */, reason) {
-    await sleep(300);
-    const apps = read(APPS_KEY);
-    const idx = apps.findIndex((a) => a.id === appId);
-    if (idx === -1) throw new Error('Application not found.');
-    apps[idx].status = action === 'approve' ? 'approved' : 'rejected';
-    apps[idx].decidedAt = new Date().toISOString();
-    if (reason) apps[idx].reason = reason;
-    write(APPS_KEY, apps);
-    return apps[idx];
+  async decideApplication(appId, action, reason) {
+    const { data } = await api.post(`/seller/applications/${appId}/decide`, { action, reason: reason || '' });
+    return data;
   },
-
-  isApprovedSeller(userId) {
-    return read(APPS_KEY).some((a) => a.userId === userId && a.status === 'approved');
+  async isApprovedSeller(_userId) {
+    const { data } = await api.get('/seller/applications/mine');
+    return data.some((a) => a.status === 'approved');
   },
 
   // ---------- Products ----------
-  async submitProduct(userId, data) {
-    await sleep(400);
-    const prods = read(PRODS_KEY);
-    const prod = {
-      id: `sp_${Math.random().toString(36).slice(2, 10)}`,
-      userId,
-      status: 'pending', // pending | approved | rejected
-      createdAt: new Date().toISOString(),
-      ...data,
-    };
-    prods.unshift(prod);
-    write(PRODS_KEY, prods);
-    return prod;
+  async submitProduct(_userId, data) {
+    const { data: res } = await api.post('/seller/products', {
+      title: data.title,
+      category: data.category,
+      isCustomCategory: !!data.isCustomCategory,
+      price: Number(data.price),
+      description: data.description,
+      image: data.image || '',
+      fileId: data.fileId || '',
+      fileName: data.fileName || '',
+    });
+    return res;
   },
   async listProducts({ status, userId } = {}) {
-    await sleep(200);
-    let list = read(PRODS_KEY);
-    if (status) list = list.filter((p) => p.status === status);
-    if (userId) list = list.filter((p) => p.userId === userId);
-    return list;
+    const params = {};
+    if (status) params.status = status;
+    if (userId) params.userId = userId;
+    const { data } = await api.get('/seller/products', { params });
+    return data;
   },
   async decideProduct(productId, action, reason) {
-    await sleep(250);
-    const list = read(PRODS_KEY);
-    const idx = list.findIndex((p) => p.id === productId);
-    if (idx === -1) throw new Error('Product not found.');
-    list[idx].status = action === 'approve' ? 'approved' : 'rejected';
-    list[idx].decidedAt = new Date().toISOString();
-    if (reason) list[idx].reason = reason;
-    write(PRODS_KEY, list);
-    return list[idx];
+    const { data } = await api.post(`/seller/products/${productId}/decide`, { action, reason: reason || '' });
+    return data;
   },
   async updateProduct(productId, patch) {
-    await sleep(200);
-    const list = read(PRODS_KEY);
-    const idx = list.findIndex((p) => p.id === productId);
-    if (idx === -1) throw new Error('Product not found.');
-    list[idx] = { ...list[idx], ...patch, updatedAt: new Date().toISOString() };
-    write(PRODS_KEY, list);
-    return list[idx];
+    const { data } = await api.patch(`/seller/products/${productId}`, patch);
+    return data;
   },
 
   // ---------- Withdrawals ----------
-  async requestWithdrawal(userId, amount, method) {
-    await sleep(300);
-    const list = read(WITHDRAWALS_KEY);
-    const w = {
-      id: `wd_${Math.random().toString(36).slice(2, 8)}`,
-      userId,
-      amount: Number(amount),
-      method: method || 'Bank transfer',
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    };
-    list.unshift(w);
-    write(WITHDRAWALS_KEY, list);
-    return w;
+  async requestWithdrawal(_userId, amount, method) {
+    const { data } = await api.post('/seller/withdrawals', { amount: Number(amount), method: method || 'Bank transfer' });
+    return data;
   },
   async listWithdrawals({ status, userId } = {}) {
-    await sleep(200);
-    let list = read(WITHDRAWALS_KEY);
-    if (status) list = list.filter((w) => w.status === status);
-    if (userId) list = list.filter((w) => w.userId === userId);
-    return list;
+    const params = {};
+    if (status) params.status = status;
+    if (userId) params.userId = userId;
+    const { data } = await api.get('/seller/withdrawals', { params });
+    return data;
   },
   async decideWithdrawal(id, action) {
-    await sleep(200);
-    const list = read(WITHDRAWALS_KEY);
-    const idx = list.findIndex((w) => w.id === id);
-    if (idx === -1) throw new Error('Withdrawal not found.');
-    list[idx].status = action === 'approve' ? 'approved' : 'rejected';
-    list[idx].decidedAt = new Date().toISOString();
-    write(WITHDRAWALS_KEY, list);
-    return list[idx];
+    const { data } = await api.post(`/seller/withdrawals/${id}/decide`, { action });
+    return data;
+  },
+
+  // ---------- File upload (deliverable / assets) ----------
+  async uploadFile(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    const { data } = await api.post('/files/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return data; // { id, filename, size }
   },
 };
 
@@ -145,3 +97,5 @@ export const SELLER_CATEGORIES = [
   'SMS Verification', 'Virtual SIM', 'eSIM', 'Hosting', 'VPS & Dedicated',
   'Payment Gateway', 'KYC Verification', 'Proxy & VPN', 'Software', 'Custom Category',
 ];
+
+export { sleep };

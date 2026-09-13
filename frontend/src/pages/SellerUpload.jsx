@@ -22,6 +22,7 @@ export default function SellerUpload() {
   const [checking, setChecking] = useState(true);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({ title: '', category: '', customCategory: '', price: '', description: '', image: '' });
+  const [deliverable, setDeliverable] = useState(null); // { file, name }
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -63,6 +64,13 @@ export default function SellerUpload() {
     setSubmitting(true);
     try {
       const category = form.customCategory || form.category;
+      let fileId = '';
+      let fileName = '';
+      if (deliverable?.file) {
+        const uploaded = await sellerService.uploadFile(deliverable.file);
+        fileId = uploaded.id;
+        fileName = uploaded.filename;
+      }
       const p = await sellerService.submitProduct(user.id, {
         title: form.title,
         category,
@@ -70,6 +78,8 @@ export default function SellerUpload() {
         price: Number(form.price),
         description: form.description,
         image: form.image,
+        fileId,
+        fileName,
       });
       push({
         title: 'Product submitted for review',
@@ -80,6 +90,7 @@ export default function SellerUpload() {
       });
       toast({ title: 'Product submitted', description: 'Admin will review shortly.' });
       setForm({ title: '', category: '', customCategory: '', price: '', description: '', image: '' });
+      setDeliverable(null);
       setProducts(await sellerService.listProducts({ userId: user.id }));
     } catch (err) {
       setError(err.message || 'Submission failed.');
@@ -160,6 +171,31 @@ export default function SellerUpload() {
                       <img src={form.image} alt="preview" className="h-16 w-24 object-cover rounded-lg border border-white/10" />
                       <button type="button" onClick={() => set('image', '')} className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-rose-500 text-white flex items-center justify-center"><X size={12} /></button>
                     </div>
+                  )}
+                </div>
+              </F>
+
+              <F label="Product file (deliverable)" hint="Buyers download after payment · max 50MB">
+                <div className="flex items-center gap-4">
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-slate-200 px-3 py-2 text-sm cursor-pointer btn-hover">
+                    <Upload size={14} /> Choose file
+                    <input
+                      type="file"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        if (f.size > 50 * 1024 * 1024) { setError('Product file must be under 50MB.'); return; }
+                        setDeliverable({ file: f, name: f.name });
+                      }}
+                      className="hidden"
+                      data-testid="seller-deliverable-input"
+                    />
+                  </label>
+                  {deliverable && (
+                    <span className="inline-flex items-center gap-2 text-xs text-slate-300">
+                      <FileText size={13} className="text-emerald-400" /> {deliverable.name}
+                      <button type="button" onClick={() => setDeliverable(null)} className="text-rose-300 hover:text-rose-200"><X size={12} /></button>
+                    </span>
                   )}
                 </div>
               </F>

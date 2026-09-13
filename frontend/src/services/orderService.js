@@ -1,21 +1,5 @@
-// Additive Order service - localStorage-based mock.
-// Structure mirrors existing authService/sellerService so it can later be swapped
-// for real backend calls without changing any UI consumers.
-
-const ORDERS_KEY = 'shahlance_orders';
-
-function read() {
-  try { return JSON.parse(localStorage.getItem(ORDERS_KEY) || '[]'); }
-  catch { return []; }
-}
-function write(list) {
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(list));
-}
-function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
-
-// Order statuses: pending | processing | completed | cancelled
-// Payment statuses: pending | paid | refunded
-// Admin approval (services): pending | approved | rejected
+// Backend-backed order service. Same signatures as before.
+import api from './apiClient';
 
 export const ORDER_STATUS = {
   PENDING: 'pending',
@@ -26,73 +10,66 @@ export const ORDER_STATUS = {
 
 export const orderService = {
   async list() {
-    await sleep(150);
-    return read();
+    const { data } = await api.get('/orders');
+    return data;
   },
 
   async listByBuyer(userId) {
-    await sleep(120);
-    return read().filter((o) => o.buyerId === userId);
+    const { data } = await api.get('/orders');
+    return data.filter((o) => o.buyerId === userId);
   },
 
   async listBySeller(sellerName) {
-    await sleep(120);
-    return read().filter((o) => o.sellerName === sellerName);
+    const { data } = await api.get('/orders');
+    return data.filter((o) => o.sellerName === sellerName);
   },
 
   async getById(orderId) {
-    await sleep(80);
-    return read().find((o) => o.id === orderId) || null;
+    try {
+      const { data } = await api.get(`/orders/${orderId}`);
+      return data;
+    } catch {
+      return null;
+    }
   },
 
   async create(payload) {
-    await sleep(300);
-    const list = read();
-    const order = {
-      id: `o_${Math.random().toString(36).slice(2, 10)}`,
+    const { data } = await api.post('/orders', {
       productId: payload.productId,
       title: payload.title,
       sellerName: payload.sellerName,
       sellerAvatar: payload.sellerAvatar || '',
-      buyerId: payload.buyerId,
-      buyerName: payload.buyerName || 'Buyer',
-      price: payload.price,
+      price: Number(payload.price),
       priceLabel: payload.priceLabel || '',
       category: payload.category || '',
       deliveryDays: payload.deliveryDays || 3,
-      status: ORDER_STATUS.PENDING,
-      paymentStatus: 'pending',
       note: payload.note || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    list.unshift(order);
-    write(list);
-    return order;
+    });
+    return data;
   },
 
   async updateStatus(orderId, status) {
-    await sleep(200);
-    const list = read();
-    const idx = list.findIndex((o) => o.id === orderId);
-    if (idx === -1) throw new Error('Order not found');
-    list[idx] = { ...list[idx], status, updatedAt: new Date().toISOString() };
-    write(list);
-    return list[idx];
+    const { data } = await api.patch(`/orders/${orderId}/status`, { status });
+    return data;
   },
 
   async updatePayment(orderId, paymentStatus) {
-    await sleep(200);
-    const list = read();
-    const idx = list.findIndex((o) => o.id === orderId);
-    if (idx === -1) throw new Error('Order not found');
-    list[idx] = { ...list[idx], paymentStatus, updatedAt: new Date().toISOString() };
-    write(list);
-    return list[idx];
+    const { data } = await api.patch(`/orders/${orderId}/payment`, { paymentStatus });
+    return data;
+  },
+
+  // Stripe checkout: returns { checkout_url, session_id }
+  async startCheckout(orderId, originUrl) {
+    const { data } = await api.post('/payments/checkout', { order_id: orderId, origin_url: originUrl });
+    return data;
+  },
+
+  async paymentStatus(sessionId) {
+    const { data } = await api.get(`/payments/status/${sessionId}`);
+    return data;
   },
 };
 
-// Aggregated seller analytics helper
 export function computeSellerAnalytics(orders) {
   const total = orders.length;
   const completed = orders.filter((o) => o.status === ORDER_STATUS.COMPLETED).length;

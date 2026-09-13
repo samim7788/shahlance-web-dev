@@ -8,6 +8,7 @@ import { ChevronLeft, Clock, Shield, CheckCircle2, Lock, ChevronRight } from 'lu
 import { PRODUCTS, CATEGORIES } from '../mock/data';
 import { useAuth } from '../contexts/AuthContext';
 import { useOrders } from '../contexts/OrdersContext';
+import { orderService } from '../services/orderService';
 import { useNotifications } from '../contexts/NotificationsContext';
 import { useToast } from '../hooks/use-toast';
 
@@ -57,18 +58,18 @@ export default function Checkout() {
         deliveryDays: product.deliveryDays,
         note,
       });
+      // Redirect to Stripe Checkout (test mode).
+      const { checkout_url } = await orderService.startCheckout(order.id, window.location.origin);
       push({
-        title: 'Order placed successfully',
-        message: `Your order for "${product.title}" is pending seller confirmation.`,
-        kind: 'success',
+        title: 'Redirecting to secure payment',
+        message: `Complete payment for "${product.title}" to confirm your order.`,
+        kind: 'info',
         category: 'product',
         link: '/dashboard/buyer-orders',
       });
-      toast({ title: 'Order placed', description: 'Your order has been submitted.' });
-      navigate(`/orders/success/${order.id}`);
+      window.location.href = checkout_url;
     } catch (e) {
-      toast({ title: 'Could not place order', description: e.message || 'Please try again.', variant: 'destructive' });
-    } finally {
+      toast({ title: 'Could not start checkout', description: e.message || 'Please try again.', variant: 'destructive' });
       setSubmitting(false);
     }
   };
@@ -165,11 +166,11 @@ export default function Checkout() {
               className="mt-6 w-full h-11 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold"
               data-testid="checkout-confirm-btn"
             >
-              {submitting ? 'Placing order...' : `Confirm order — $${product.price.toFixed(2)}`}
+              {submitting ? 'Redirecting to payment...' : `Pay securely — $${product.price.toFixed(2)}`}
             </Button>
 
             <p className="mt-3 text-[11px] text-slate-500 text-center">
-              By confirming, you agree to the ShahLance escrow terms.
+              Secured by Stripe · Use test card 4242 4242 4242 4242
             </p>
           </div>
         </div>

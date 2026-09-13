@@ -1,29 +1,25 @@
-// Additive saved-services (wishlist) service - localStorage per user.
-
-function key(userId) { return `shahlance_saved_${userId || 'guest'}`; }
-
-function read(userId) {
-  try { return JSON.parse(localStorage.getItem(key(userId)) || '[]'); }
-  catch { return []; }
-}
-function write(userId, list) {
-  localStorage.setItem(key(userId), JSON.stringify(list));
-}
+// Backend-backed wishlist service. Now async (returns promises).
+import api from './apiClient';
 
 export const savedService = {
-  list(userId) { return read(userId); },
-  isSaved(userId, productId) { return read(userId).includes(productId); },
-  toggle(userId, productId) {
-    const list = read(userId);
-    const next = list.includes(productId)
-      ? list.filter((id) => id !== productId)
-      : [productId, ...list];
-    write(userId, next);
-    return next;
+  async list() {
+    try {
+      const { data } = await api.get('/saved');
+      return data;
+    } catch {
+      return [];
+    }
   },
-  remove(userId, productId) {
-    const next = read(userId).filter((id) => id !== productId);
-    write(userId, next);
-    return next;
+  async isSaved(_userId, productId) {
+    const items = await this.list();
+    return items.includes(productId);
+  },
+  async toggle(_userId, productId) {
+    const { data } = await api.post('/saved/toggle', { productId });
+    return data;
+  },
+  async remove(_userId, productId) {
+    const { data } = await api.delete(`/saved/${productId}`);
+    return data;
   },
 };

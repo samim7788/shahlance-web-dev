@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOrders } from '../contexts/OrdersContext';
 import { ORDER_STATUS } from '../services/orderService';
 import { savedService } from '../services/savedService';
+import api from '../services/apiClient';
 import { useToast } from '../hooks/use-toast';
 
 const TABS = [
@@ -33,7 +34,11 @@ export default function BuyerOrders() {
   const [tab, setTab] = useState('all');
   const [reviewingOrder, setReviewingOrder] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
-  const [savedIds, setSavedIds] = useState(user ? savedService.list(user.id) : []);
+  const [savedIds, setSavedIds] = useState([]);
+
+  useEffect(() => {
+    if (user) savedService.list(user.id).then(setSavedIds).catch(() => setSavedIds([]));
+  }, [user]);
 
   const myOrders = useMemo(
     () => orders.filter((o) => o.buyerId === user?.id),
@@ -89,9 +94,25 @@ export default function BuyerOrders() {
     }
   };
 
-  const toggleSaved = (productId) => {
-    const next = savedService.toggle(user.id, productId);
+  const toggleSaved = async (productId) => {
+    const next = await savedService.toggle(user.id, productId);
     setSavedIds(next);
+  };
+
+  const downloadDeliverable = async (o) => {
+    try {
+      const res = await api.get(`/orders/${o.id}/download`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = o.fileName || 'download';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast({ title: 'Download unavailable', description: 'The file could not be downloaded.', variant: 'destructive' });
+    }
   };
 
   const paidOrders = useMemo(
@@ -173,6 +194,7 @@ export default function BuyerOrders() {
               orders={filtered}
               onCancel={cancelOrder}
               onReview={setReviewingOrder}
+              onDownload={downloadDeliverable}
               testId={`buyer-orders-table-${tab}`}
             />
           )}
@@ -236,7 +258,7 @@ function StatCard({ label, value, Icon, color }) {
   );
 }
 
-function OrdersTable({ orders, onCancel, onReview, testId }) {
+function OrdersTable({ orders, onCancel, onReview, onDownload, testId }) {
   if (!orders || orders.length === 0) {
     return (
       <div className="card-surface rounded-2xl p-10 text-center" data-testid={`${testId}-empty`}>
@@ -296,6 +318,15 @@ function OrdersTable({ orders, onCancel, onReview, testId }) {
               >
                 Leave review
               </Button>
+            )}
+            {o.paymentStatus === 'paid' && o.fileId && (
+              <button
+                onClick={() => onDownload(o)}
+                className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-300 text-xs font-semibold px-3 py-1.5 btn-hover"
+                data-testid={`buyer-order-download-${o.id}`}
+              >
+                Download files
+              </button>
             )}
           </div>
         </li>

@@ -27,6 +27,7 @@ import OrderSuccess from './pages/OrderSuccess';
 import BuyerOrders from './pages/BuyerOrders';
 import SellerOrders from './pages/SellerOrders';
 import AdminOrders from './pages/AdminOrders';
+import PaymentReturn from './pages/PaymentReturn';
 import NotFound from './pages/NotFound';
 import { Toaster } from './components/ui/toaster';
 import { AuthProvider } from './contexts/AuthContext';
@@ -130,6 +131,9 @@ function App() {
               path="/admin/orders"
               element={<ProtectedRoute><AdminOrders /></ProtectedRoute>}
             />
+            {/* Stripe payment return routes */}
+            <Route path="/payment/success" element={<ProtectedRoute><PaymentReturn /></ProtectedRoute>} />
+            <Route path="/payment/cancel" element={<PaymentReturn />} />
             {/* Additive: catch-all 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>

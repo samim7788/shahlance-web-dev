@@ -8,10 +8,12 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Hydrate from storage
-    const u = authService.getCurrentUser();
-    setUser(u);
-    setLoading(false);
+    // Hydrate the session from the backend using the stored JWT.
+    (async () => {
+      const u = await authService.fetchCurrentUser();
+      setUser(u);
+      setLoading(false);
+    })();
   }, []);
 
   const login = useCallback(async (credentials) => {
@@ -21,9 +23,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signUp = useCallback(async (payload) => {
-    const created = await authService.signUp(payload);
-    // auto login after signup
-    const u = await authService.login({ identifier: created.email, password: payload.password, remember: true });
+    // register() logs the user in (returns a token) in one round-trip.
+    const u = await authService.signUp(payload);
     setUser(u);
     return u;
   }, []);

@@ -64,9 +64,9 @@ export default function ServiceDetails() {
     navigate(`/orders/checkout/${product.id}`);
   };
 
-  const toggleSaved = () => {
+  const toggleSaved = async () => {
     if (!user) { navigate('/login'); return; }
-    savedService.toggle(user.id, product.id);
+    await savedService.toggle(user.id, product.id);
     toast({ title: 'Updated', description: 'Your saved services list has been updated.' });
   };
 

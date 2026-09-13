@@ -1,46 +1,34 @@
-/* App-level styles for ShahLance clone */
-.App {
-  min-height: 100vh;
+.App-logo {
+    height: 40vmin;
+    pointer-events: none;
 }
 
-/* Hero radial background glow */
-.hero-glow {
-  background:
-    radial-gradient(1000px 400px at 50% -100px, rgba(34, 197, 94, 0.18), transparent 60%),
-    radial-gradient(600px 300px at 20% 200px, rgba(59, 130, 246, 0.08), transparent 60%),
-    radial-gradient(600px 300px at 80% 100px, rgba(168, 85, 247, 0.06), transparent 60%);
+@media (prefers-reduced-motion: no-preference) {
+    .App-logo {
+        animation: App-logo-spin infinite 20s linear;
+    }
 }
 
-.section-glow {
-  background: radial-gradient(800px 300px at 50% 0%, rgba(34, 197, 94, 0.06), transparent 70%);
+.App-header {
+    background-color: #0f0f10;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(10px + 2vmin);
+    color: white;
 }
 
-.card-surface {
-  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-  border: 1px solid rgba(255, 255, 255, 0.06);
+.App-link {
+    color: #61dafb;
 }
 
-.card-surface:hover {
-  border-color: rgba(34, 197, 94, 0.35);
+@keyframes App-logo-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
-
-.text-gradient-green {
-  background: linear-gradient(90deg, #22c55e 0%, #10b981 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #0a0f1e; }
-::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 6px; }
-::-webkit-scrollbar-thumb:hover { background: #374151; }
-
-/* Prevent transitions on transform breaking */
-.btn-hover { transition: background-color 200ms ease, color 200ms ease, box-shadow 200ms ease, border-color 200ms ease; }
-.card-hover { transition: border-color 250ms ease, box-shadow 250ms ease, background-color 250ms ease; }
-
-/* Line clamp utility (fallback) */
-.clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

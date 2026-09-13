@@ -13,7 +13,8 @@ import { Slider } from '../components/ui/slider';
 import { Checkbox } from '../components/ui/checkbox';
 import { Label } from '../components/ui/label';
 import { Search as SearchIcon, SlidersHorizontal, X, ArrowUpDown, ChevronRight } from 'lucide-react';
-import { CATEGORIES, PRODUCTS } from '../mock/data';
+import { CATEGORIES } from '../mock/data';
+import { useProducts } from '../contexts/ProductsContext';
 
 const SORTS = [
   { id: 'relevance', label: 'Relevance' },
@@ -27,6 +28,7 @@ const SORTS = [
 const PAGE_SIZE = 9;
 
 export default function Search() {
+  const { products: PRODUCTS } = useProducts();
   const [sp, setSp] = useSearchParams();
   const navigate = useNavigate();
   const q = sp.get('q') || '';
@@ -85,7 +87,7 @@ export default function Search() {
       default: break;
     }
     return list;
-  }, [q, selectedCategories, priceRange, minRating, sort]);
+  }, [q, selectedCategories, priceRange, minRating, sort, PRODUCTS]);
 
   const visible = filtered.slice(0, page * PAGE_SIZE);
   const canLoadMore = visible.length < filtered.length;

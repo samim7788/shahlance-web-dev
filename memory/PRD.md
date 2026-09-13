@@ -23,6 +23,12 @@ Continue development of an existing GitHub project (samim7788/shahlance-web-dev)
 - Frontend wired: AuthContext async hydration; Checkout→Stripe redirect + PaymentReturn page; SellerUpload deliverable upload; BuyerOrders secure download button; saved-service consumers made async.
 - Verified: testing_agent iteration_2 → backend 20/20 pytest PASS, frontend targeted flows 100% PASS. Extra security curl checks all pass.
 
+## Implemented (Sep 2026 — Live Product Catalog)
+- Canonical catalog (33 products) + categories moved to `backend/catalog_seed.py`, seeded into MongoDB `products` (approved) on startup. Public `GET /api/products`, `GET /api/products/{id}`, `GET /api/categories`.
+- `_all_products()` merges seeded catalog + APPROVED seller uploads into one shape and overlays live ratings/counts computed from reviews. Newly approved seller products appear in the public marketplace automatically.
+- Frontend `ProductsContext`/`useProducts` fetches `/api/products` once at boot; Home/Search/Marketplace/ServicesMarketplace/ProductDetail/ServiceDetails/Checkout/BuyerOrders now read the live catalog (browse/search/filter/sort/detail). Loading spinners guard detail pages. CATEGORIES/*_IDS remain static config.
+- Verified: testing_agent iteration_3 → backend 24/24 pytest PASS, all frontend catalog + regression flows PASS (auth, Stripe checkout, seller upload→approve→appears live, buyer orders/saved).
+
 ## Known scope notes
 - The BROWSING catalog (Home/Search/Marketplace/ProductDetail/ServiceDetails) still reads static seed data from `frontend/src/mock/data.js`. All DYNAMIC data (users, orders, reviews, saved, seller apps/products, withdrawals, payments, files) is fully MongoDB-backed; no localStorage persistence remains for these.
 - Stripe uses the shared TEST sandbox (sk_test_emergent). A claimable sandbox is unavailable for account country BD; going live requires a Stripe-supported account.

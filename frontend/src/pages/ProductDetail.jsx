@@ -5,14 +5,24 @@ import ProductCard from '../components/ProductCard';
 import { Button } from '../components/ui/button';
 import { ChevronLeft, Star, Clock, Shield, CheckCircle2, MessageCircle, Heart, Share2, ChevronRight } from 'lucide-react';
 import * as Icons from 'lucide-react';
-import { PRODUCTS, CATEGORIES } from '../mock/data';
+import { CATEGORIES } from '../mock/data';
+import { useProducts } from '../contexts/ProductsContext';
 import { useToast } from '../hooks/use-toast';
 
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { products: PRODUCTS, loading: productsLoading } = useProducts();
   const product = PRODUCTS.find((p) => p.id === id);
+
+  if (productsLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center">
+        <div className="h-10 w-10 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   if (!product) {
     return (

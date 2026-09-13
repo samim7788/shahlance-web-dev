@@ -342,3 +342,84 @@ def test_download_after_paid(admin_token, buyer_token, seller_token):
     other = rr.json()["token"]
     d3 = requests.get(f"{API}/orders/{oid}/download", headers=_h(other), timeout=10)
     assert d3.status_code == 403
+
+
+
+# ---------- Live Product Catalog (iteration 3) ----------
+REQUIRED_PRODUCT_FIELDS = {
+    "id", "title", "description", "category", "tags", "price", "priceLabel",
+    "rating", "reviews", "icon", "color", "seller", "deliveryDays", "features",
+}
+
+
+def test_list_products_returns_seeded_catalog():
+    r = requests.get(f"{API}/products", timeout=15)
+    assert r.status_code == 200
+    prods = r.json()
+    assert isinstance(prods, list)
+    ids = {p["id"] for p in prods}
+    # 33 seeded products p-001..p-033 must all be present
+    for i in range(1, 34):
+        pid = f"p-{i:03d}"
+        assert pid in ids, f"missing seeded product {pid}"
+    # spot check shape on p-001
+    p = next(p for p in prods if p["id"] == "p-001")
+    missing = REQUIRED_PRODUCT_FIELDS - set(p.keys())
+    assert not missing, f"p-001 missing fields: {missing}"
+    assert isinstance(p["seller"], dict)
+    for sk in ("name", "rating", "sales", "avatar"):
+        assert sk in p["seller"], f"seller missing {sk}"
+    assert isinstance(p["tags"], list) and p["tags"]
+    assert isinstance(p["features"], list) and p["features"]
+    assert isinstance(p["price"], (int, float))
+
+
+def test_get_product_by_id_known_and_unknown():
+    r = requests.get(f"{API}/products/p-009", timeout=10)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["id"] == "p-009"
+    assert "Telegram" in d["title"]
+    r2 = requests.get(f"{API}/products/does-not-exist-xyz", timeout=10)
+    assert r2.status_code == 404
+
+
+def test_list_categories():
+    r = requests.get(f"{API}/categories", timeout=10)
+    assert r.status_code == 200
+    cats = r.json()
+    assert isinstance(cats, list) and len(cats) >= 10
+    ids = {c["id"] for c in cats}
+    for expected in ("accounts", "digital-marketing", "software", "premium-subscriptions"):
+        assert expected in ids
+
+
+def test_approved_seller_product_appears_in_public_catalog(admin_token, seller_token):
+    files = {"file": ("live.txt", io.BytesIO(b"live-catalog-test"), "text/plain")}
+    fr = requests.post(f"{API}/files/upload",
+                       headers={"Authorization": f"Bearer {seller_token}"}, files=files, timeout=30)
+    assert fr.status_code == 200
+    file_id = fr.json()["id"]
+    unique_title = f"TEST Live Catalog {uuid.uuid4().hex[:6]}"
+    pr = requests.post(f"{API}/seller/products", headers=_h(seller_token), json={
+        "title": unique_title, "category": "software", "price": 7.5,
+        "description": "long description " * 5,
+        "fileId": file_id, "fileName": "live.txt",
+    }, timeout=15)
+    assert pr.status_code == 200
+    prod_id = pr.json()["id"]
+    # not visible before approval
+    pub = requests.get(f"{API}/products", timeout=15).json()
+    assert not any(p["id"] == prod_id for p in pub)
+    # approve
+    dec = requests.post(f"{API}/seller/products/{prod_id}/decide",
+                        headers=_h(admin_token), json={"action": "approve"}, timeout=10)
+    assert dec.status_code == 200
+    # now visible
+    pub2 = requests.get(f"{API}/products", timeout=15).json()
+    match = next((p for p in pub2 if p["id"] == prod_id), None)
+    assert match is not None, "approved seller product should be in live catalog"
+    assert match["title"] == unique_title
+    # shape must include the same fields as seeded products (best-effort)
+    for k in ("id", "title", "price", "category"):
+        assert k in match

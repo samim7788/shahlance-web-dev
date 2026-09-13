@@ -9,7 +9,8 @@ import {
   Search, ArrowUpDown, Sparkles, ShieldCheck, ChevronRight, Store, Filter,
   ArrowRight, X, Grid3x3,
 } from 'lucide-react';
-import { CATEGORIES, PRODUCTS } from '../mock/data';
+import { CATEGORIES } from '../mock/data';
+import { useProducts } from '../contexts/ProductsContext';
 
 const SORTS = [
   { id: 'popular', label: 'Most Popular' },
@@ -27,6 +28,7 @@ const PRIMARY_CATEGORIES = [
 ];
 
 export default function Marketplace() {
+  const { products: PRODUCTS } = useProducts();
   const [sp, setSp] = useSearchParams();
   const navigate = useNavigate();
   const initialCat = sp.get('category') || 'all';
@@ -62,7 +64,7 @@ export default function Marketplace() {
       default: list.sort((a, b) => b.reviews - a.reviews);
     }
     return list;
-  }, [q, activeCat, sort]);
+  }, [q, activeCat, sort, PRODUCTS]);
 
   const visible = filtered.slice(0, visibleCount);
   const canLoadMore = visibleCount < filtered.length;

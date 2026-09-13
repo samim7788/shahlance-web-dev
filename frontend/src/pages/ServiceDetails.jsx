@@ -8,7 +8,8 @@ import StarRating from '../components/StarRating';
 import { Button } from '../components/ui/button';
 import * as Icons from 'lucide-react';
 import { ChevronLeft, Clock, Shield, CheckCircle2, ChevronRight, Heart, Share2, ShoppingBag, Lock } from 'lucide-react';
-import { PRODUCTS, CATEGORIES } from '../mock/data';
+import { CATEGORIES } from '../mock/data';
+import { useProducts } from '../contexts/ProductsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useOrders } from '../contexts/OrdersContext';
 import { savedService } from '../services/savedService';
@@ -21,6 +22,7 @@ export default function ServiceDetails() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { reviews } = useOrders();
+  const { products: PRODUCTS, loading: productsLoading } = useProducts();
   const product = PRODUCTS.find((p) => p.id === id);
 
   const productReviews = useMemo(
@@ -33,6 +35,14 @@ export default function ServiceDetails() {
   );
   const productSummary = summarize(productReviews);
   const sellerSummary = summarize(sellerReviews);
+
+  if (productsLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center">
+        <div className="h-10 w-10 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   if (!product) {
     return (

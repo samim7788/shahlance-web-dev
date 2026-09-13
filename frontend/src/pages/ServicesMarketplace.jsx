@@ -5,7 +5,8 @@ import Footer from '../components/Footer';
 import MarketplaceServiceCard from '../components/MarketplaceServiceCard';
 import MarketplaceFilters from '../components/MarketplaceFilters';
 import { Sparkles, Flame, ArrowUpDown, Store, ShieldCheck, Zap } from 'lucide-react';
-import { PRODUCTS, POPULAR_IDS, FEATURED_IDS } from '../mock/data';
+import { POPULAR_IDS, FEATURED_IDS } from '../mock/data';
+import { useProducts } from '../contexts/ProductsContext';
 import { useOrders } from '../contexts/OrdersContext';
 import { summarize } from '../services/reviewService';
 
@@ -18,6 +19,7 @@ const SORTS = [
 ];
 
 export default function ServicesMarketplace() {
+  const { products: PRODUCTS } = useProducts();
   const [sp, setSp] = useSearchParams();
   const { reviews } = useOrders();
 
@@ -63,15 +65,15 @@ export default function ServicesMarketplace() {
       default: list.sort((a, b) => b.reviews - a.reviews);
     }
     return list;
-  }, [q, category, minPrice, maxPrice, minRating, sort, reviewMap]);
+  }, [q, category, minPrice, maxPrice, minRating, sort, reviewMap, PRODUCTS]);
 
   const popular = useMemo(
     () => PRODUCTS.filter((p) => POPULAR_IDS.includes(p.id)).slice(0, 4),
-    []
+    [PRODUCTS]
   );
   const recommended = useMemo(
     () => PRODUCTS.filter((p) => FEATURED_IDS.includes(p.id)).slice(0, 4),
-    []
+    [PRODUCTS]
   );
 
   const clearAll = () => {

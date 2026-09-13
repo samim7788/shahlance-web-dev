@@ -5,7 +5,8 @@ import Footer from '../components/Footer';
 import { Button } from '../components/ui/button';
 import * as Icons from 'lucide-react';
 import { ChevronLeft, Clock, Shield, CheckCircle2, Lock, ChevronRight } from 'lucide-react';
-import { PRODUCTS, CATEGORIES } from '../mock/data';
+import { CATEGORIES } from '../mock/data';
+import { useProducts } from '../contexts/ProductsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useOrders } from '../contexts/OrdersContext';
 import { orderService } from '../services/orderService';
@@ -22,9 +23,18 @@ export default function Checkout() {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const { products: PRODUCTS, loading: productsLoading } = useProducts();
   const product = PRODUCTS.find((p) => p.id === id);
   const category = product ? CATEGORIES.find((c) => c.id === product.category) : null;
   const Icon = product ? (Icons[product.icon] || Icons.Package) : Icons.Package;
+
+  if (productsLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center">
+        <div className="h-10 w-10 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   if (!product) {
     return (

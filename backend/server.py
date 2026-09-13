@@ -24,6 +24,17 @@ from emergentintegrations.payments.stripe.checkout import (
     StripeCheckout, CheckoutSessionRequest,
 )
 
+from catalog_seed import build_seed_products, CATEGORIES as SEED_CATEGORIES, CATEGORY_NAME_TO_ID
+
+CATEGORY_COLOR = {c['id']: c['color'] for c in SEED_CATEGORIES}
+CATEGORY_ICON = {c['id']: c['icon'] for c in SEED_CATEGORIES}
+DEFAULT_FEATURES = [
+    'Escrow protected payment',
+    'Instant or same-day delivery',
+    '30-day support included',
+    'Money-back guarantee',
+]
+
 # ---------------------------------------------------------------------------
 # Config & DB
 # ---------------------------------------------------------------------------
@@ -512,6 +523,83 @@ async def remove_review(review_id: str, user: dict = Depends(require_admin)):
 
 
 # ---------------------------------------------------------------------------
+# Products (public catalog: seeded catalog + approved seller uploads)
+# ---------------------------------------------------------------------------
+async def _rating_map(product_ids):
+    """avg rating + count per productId from visible reviews."""
+    if not product_ids:
+        return {}
+    pipeline = [
+        {'$match': {'hidden': {'$ne': True}, 'productId': {'$in': list(product_ids)}}},
+        {'$group': {'_id': '$productId', 'avg': {'$avg': '$rating'}, 'count': {'$sum': 1}}},
+    ]
+    out = {}
+    async for row in db.reviews.aggregate(pipeline):
+        out[row['_id']] = {'avg': round(row['avg'], 1), 'count': row['count']}
+    return out
+
+
+async def _map_seller_product(sp: dict) -> dict:
+    cat_id = CATEGORY_NAME_TO_ID.get((sp.get('category') or '').strip().lower(), 'custom-services')
+    seller_user = await db.users.find_one({'id': sp.get('userId')})
+    seller_name = (seller_user or {}).get('fullName') or (seller_user or {}).get('username') or 'Seller'
+    from urllib.parse import quote
+    return {
+        'id': sp['id'],
+        'title': sp.get('title', ''),
+        'description': sp.get('description', ''),
+        'category': cat_id,
+        'tags': sp.get('tags', []),
+        'price': float(sp.get('price', 0)),
+        'priceLabel': sp.get('priceLabel') or 'One-time',
+        'rating': 0,
+        'reviews': 0,
+        'icon': CATEGORY_ICON.get(cat_id, 'Package'),
+        'color': CATEGORY_COLOR.get(cat_id, 'from-emerald-500 to-teal-500'),
+        'badge': 'New',
+        'image': sp.get('image', ''),
+        'seller': {'name': seller_name, 'rating': 5.0, 'sales': 0,
+                   'avatar': f"https://api.dicebear.com/7.x/avataaars/svg?seed={quote(seller_name)}"},
+        'deliveryDays': sp.get('deliveryDays', 3),
+        'features': DEFAULT_FEATURES,
+        'source': 'seller',
+    }
+
+
+async def _all_products() -> List[dict]:
+    seed = [clean(d) for d in await db.products.find({'status': 'approved'}).to_list(2000)]
+    seller_docs = await db.seller_products.find({'status': 'approved'}).sort('createdAt', -1).to_list(2000)
+    mapped = [await _map_seller_product(sp) for sp in seller_docs]
+    combined = mapped + seed  # newest seller uploads first
+    ratings = await _rating_map([p['id'] for p in combined])
+    for p in combined:
+        r = ratings.get(p['id'])
+        if r:
+            p['rating'] = r['avg']
+            p['reviews'] = r['count']
+    return combined
+
+
+@api_router.get("/products")
+async def list_products():
+    return await _all_products()
+
+
+@api_router.get("/products/{product_id}")
+async def get_product(product_id: str):
+    products = await _all_products()
+    match = next((p for p in products if p['id'] == product_id), None)
+    if not match:
+        raise HTTPException(status_code=404, detail='Product not found')
+    return match
+
+
+@api_router.get("/categories")
+async def list_categories():
+    return SEED_CATEGORIES
+
+
+# ---------------------------------------------------------------------------
 # Saved / Wishlist
 # ---------------------------------------------------------------------------
 @api_router.get("/saved")
@@ -832,8 +920,17 @@ async def startup():
         await db.orders.create_index('id', unique=True)
         await db.reviews.create_index('id', unique=True)
         await db.password_reset_tokens.create_index('expiresAt', expireAfterSeconds=0)
+        await db.products.create_index('id', unique=True)
     except Exception as e:
         logger.warning(f"index setup: {e}")
+    # Seed catalog products (idempotent upsert by id)
+    try:
+        for p in build_seed_products():
+            await db.products.update_one({'id': p['id']}, {'$setOnInsert': p}, upsert=True)
+        count = await db.products.count_documents({})
+        logger.info(f"Catalog products in DB: {count}")
+    except Exception as e:
+        logger.error(f"product seed failed: {e}")
     # Seed admin
     try:
         existing = await db.users.find_one({'email': ADMIN_EMAIL})

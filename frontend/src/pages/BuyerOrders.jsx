@@ -9,7 +9,7 @@ import ReviewForm from '../components/ReviewForm';
 import StarRating from '../components/StarRating';
 import { Button } from '../components/ui/button';
 import { Package, Clock, CheckCircle2, XCircle, Heart, Star, CreditCard, ChevronRight, Home as HomeIcon } from 'lucide-react';
-import { PRODUCTS } from '../mock/data';
+import { useProducts } from '../contexts/ProductsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useOrders } from '../contexts/OrdersContext';
 import { ORDER_STATUS } from '../services/orderService';
@@ -29,6 +29,7 @@ const TABS = [
 
 export default function BuyerOrders() {
   const { user } = useAuth();
+  const { products: PRODUCTS } = useProducts();
   const { orders, reviews, updateOrderStatus, submitReview } = useOrders();
   const { toast } = useToast();
   const [tab, setTab] = useState('all');
@@ -50,7 +51,7 @@ export default function BuyerOrders() {
   );
   const savedProducts = useMemo(
     () => PRODUCTS.filter((p) => savedIds.includes(p.id)),
-    [savedIds]
+    [savedIds, PRODUCTS]
   );
 
   const filtered = useMemo(() => {

@@ -6,16 +6,18 @@ import CategoryIcon from '../components/CategoryIcon';
 import ProductCard from '../components/ProductCard';
 import { Button } from '../components/ui/button';
 import { Search, Shield, Sparkles, ArrowRight, TrendingUp, Clock3, Zap, CheckCircle2 } from 'lucide-react';
-import { CATEGORIES, PRODUCTS, FEATURED_IDS, POPULAR_IDS, RECENT_IDS, FREELANCER_CATEGORIES } from '../mock/data';
+import { CATEGORIES, FEATURED_IDS, POPULAR_IDS, RECENT_IDS, FREELANCER_CATEGORIES } from '../mock/data';
+import { useProducts } from '../contexts/ProductsContext';
 import { FEATURED_SERVICES } from '../mock/extendedData';
 import FreelancerServiceCard from '../components/FreelancerServiceCard';
 import WorkAndEarnSection from '../components/WorkAndEarnSection';
 import PremiumHomeSections, { FooterTopStrip } from '../components/PremiumHomeSections';
 import * as Icons from 'lucide-react';
 
-const byIds = (ids) => ids.map((id) => PRODUCTS.find((p) => p.id === id)).filter(Boolean);
+const byIds = (ids, PRODUCTS) => ids.map((id) => PRODUCTS.find((p) => p.id === id)).filter(Boolean);
 
 export default function Home() {
+  const { products: PRODUCTS } = useProducts();
   const [q, setQ] = useState('');
   const navigate = useNavigate();
 
@@ -25,9 +27,9 @@ export default function Home() {
     navigate(`/search?q=${encodeURIComponent(query || 'Gmail')}`);
   };
 
-  const featured = byIds(FEATURED_IDS);
-  const popular = byIds(POPULAR_IDS);
-  const recent = byIds(RECENT_IDS);
+  const featured = byIds(FEATURED_IDS, PRODUCTS);
+  const popular = byIds(POPULAR_IDS, PRODUCTS);
+  const recent = byIds(RECENT_IDS, PRODUCTS);
 
   return (
     <div className="relative">

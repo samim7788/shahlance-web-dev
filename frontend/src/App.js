@@ -33,6 +33,7 @@ import { Toaster } from './components/ui/toaster';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import { OrdersProvider } from './contexts/OrdersContext';
+import { ProductsProvider } from './contexts/ProductsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AuthAccessWidget from './components/AuthAccessWidget';
 import LiveSupportWidget from './components/LiveSupportWidget';
@@ -59,6 +60,7 @@ function App() {
         <AuthProvider>
           <NotificationsProvider>
             <OrdersProvider>
+            <ProductsProvider>
             <ScrollToTop />
             <Routes>
             <Route path="/" element={<Home />} />
@@ -140,6 +142,7 @@ function App() {
           <AuthAccessWidget />
             <LiveSupportWidget />
             <Toaster />
+            </ProductsProvider>
             </OrdersProvider>
           </NotificationsProvider>
         </AuthProvider>

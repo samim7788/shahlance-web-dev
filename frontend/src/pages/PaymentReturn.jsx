@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Button } from '../components/ui/button';
-import { CheckCircle2, Loader2, XCircle, Home } from 'lucide-react';
+import { CheckCircle2, Loader2, XCircle, Home, Mail } from 'lucide-react';
 import { orderService } from '../services/orderService';
 import { useOrders } from '../contexts/OrdersContext';
 
@@ -68,6 +68,9 @@ export default function PaymentReturn() {
               </div>
               <h1 className="mt-6 text-2xl sm:text-3xl font-bold text-white">Payment successful</h1>
               <p className="mt-2 text-slate-400 text-sm">Your order is confirmed and now being processed.</p>
+              <p className="mt-3 inline-flex items-center gap-2 text-emerald-300 text-sm" data-testid="payment-receipt-note">
+                <Mail size={15} /> A confirmation email with your secure download link has been sent.
+              </p>
               <div className="mt-8 grid sm:grid-cols-2 gap-3">
                 <Button
                   onClick={() => navigate(orderId ? `/orders/success/${orderId}` : '/dashboard/buyer-orders')}

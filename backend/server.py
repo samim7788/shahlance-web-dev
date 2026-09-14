@@ -25,6 +25,7 @@ from emergentintegrations.payments.stripe.checkout import (
 )
 
 from catalog_seed import build_seed_products, CATEGORIES as SEED_CATEGORIES, CATEGORY_NAME_TO_ID
+import email_service
 
 CATEGORY_COLOR = {c['id']: c['color'] for c in SEED_CATEGORIES}
 CATEGORY_ICON = {c['id']: c['icon'] for c in SEED_CATEGORIES}
@@ -475,6 +476,27 @@ async def download_deliverable(order_id: str, user: dict = Depends(get_current_u
                     headers={'Content-Disposition': f'attachment; filename="{record.get("original_filename", "download")}"'})
 
 
+@api_router.get("/orders/{order_id}/receipt")
+async def get_order_receipt(order_id: str, user: dict = Depends(get_current_user)):
+    order = await db.orders.find_one({'id': order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail='Order not found')
+    if user.get('role') != 'admin' and user['id'] != order.get('buyerId'):
+        raise HTTPException(status_code=403, detail='Not allowed')
+    rcpt = await db.email_receipts.find_one({'orderId': order_id}, sort=[('sentAt', -1)])
+    if not rcpt:
+        return {'sent': False}
+    return {
+        'sent': True,
+        'to': rcpt.get('to'),
+        'subject': rcpt.get('subject'),
+        'downloadUrl': rcpt.get('downloadUrl'),
+        'provider': rcpt.get('provider'),
+        'status': rcpt.get('status'),
+        'sentAt': rcpt.get('sentAt'),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Reviews
 # ---------------------------------------------------------------------------
@@ -835,10 +857,44 @@ async def create_checkout(body: CheckoutBody, request: Request, user: dict = Dep
         'currency': 'usd',
         'status': 'initiated',
         'payment_status': 'pending',
+        'origin_url': body.origin_url,
+        'emailSent': False,
         'created_at': now_iso(),
         'updated_at': now_iso(),
     })
     return {'checkout_url': session.url, 'session_id': session.session_id}
+
+
+async def _send_order_receipt(tx: dict):
+    """Send the order confirmation receipt once (idempotent via emailSent flag)."""
+    if tx.get('emailSent'):
+        return
+    order = await db.orders.find_one({'id': tx['order_id']})
+    if not order:
+        return
+    buyer = await db.users.find_one({'id': order.get('buyerId')})
+    to_email = (buyer or {}).get('email')
+    if not to_email:
+        return
+    origin = (tx.get('origin_url') or '').rstrip('/')
+    download_url = f"{origin}/dashboard/buyer-orders" if origin else ''
+    subject = f"Your ShahLance receipt — {order.get('title', 'order')}"
+    html = email_service.build_receipt_html(order, download_url)
+    result = email_service.send_email(to_email, subject, html)
+    await db.email_receipts.insert_one({
+        'id': f"rcpt_{uuid.uuid4().hex[:12]}",
+        'orderId': order['id'],
+        'buyerId': order.get('buyerId'),
+        'to': to_email,
+        'subject': subject,
+        'downloadUrl': download_url,
+        'provider': result.get('provider'),
+        'status': result.get('status'),
+        'html': html,
+        'sentAt': now_iso(),
+    })
+    await db.payment_transactions.update_one({'session_id': tx['session_id']}, {'$set': {'emailSent': True}})
+    await db.orders.update_one({'id': order['id']}, {'$set': {'receiptSent': True}})
 
 
 async def _mark_paid(session_id: str):
@@ -852,6 +908,9 @@ async def _mark_paid(session_id: str):
         await db.orders.update_one(
             {'id': tx['order_id']},
             {'$set': {'paymentStatus': 'paid', 'status': 'processing', 'updatedAt': now_iso()}})
+        tx = await db.payment_transactions.find_one({'session_id': session_id})
+    # Send the confirmation receipt (idempotent).
+    await _send_order_receipt(tx)
 
 
 @api_router.get("/payments/status/{session_id}")

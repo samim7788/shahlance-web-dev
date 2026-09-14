@@ -423,3 +423,58 @@ def test_approved_seller_product_appears_in_public_catalog(admin_token, seller_t
     # shape must include the same fields as seeded products (best-effort)
     for k in ("id", "title", "price", "category"):
         assert k in match
+
+
+# ---------- Email Receipts (iteration 4) ----------
+def test_receipt_endpoint_before_payment_and_authz(buyer_token, admin_token):
+    """Pre-payment: sent:false. Non-owner buyer: 403. Admin: 200 with sent:false."""
+    payload = {
+        "productId": "p-030", "title": "TEST Receipt Product",
+        "sellerName": "x", "price": 5.0, "priceLabel": "$5",
+    }
+    r = requests.post(f"{API}/orders", headers=_h(buyer_token), json=payload, timeout=15)
+    assert r.status_code == 200
+    oid = r.json()["id"]
+
+    r1 = requests.get(f"{API}/orders/{oid}/receipt", headers=_h(buyer_token), timeout=10)
+    assert r1.status_code == 200
+    assert r1.json() == {"sent": False}
+
+    # other buyer -> 403
+    email = f"other_r_{uuid.uuid4().hex[:6]}@example.com"
+    rr = requests.post(f"{API}/auth/register", json={
+        "fullName": "Other R", "username": f"otherR_{uuid.uuid4().hex[:6]}",
+        "email": email, "password": "Password123!", "accountType": "client",
+    }, timeout=20)
+    other_tok = rr.json()["token"]
+    f403 = requests.get(f"{API}/orders/{oid}/receipt", headers=_h(other_tok), timeout=10)
+    assert f403.status_code == 403
+
+    # admin -> 200
+    ar = requests.get(f"{API}/orders/{oid}/receipt", headers=_h(admin_token), timeout=10)
+    assert ar.status_code == 200
+    assert ar.json()["sent"] is False
+
+
+def test_receipt_created_after_admin_mark_paid_via_checkout(admin_token, buyer_token):
+    """Admin PATCH /orders/{id}/payment does NOT trigger _mark_paid; only status-poll/webhook does.
+    So we validate the receipt endpoint shape by simulating via direct DB is out of scope.
+    Instead assert the checkout path returns emailSent guard field via /payments/checkout inserts
+    (indirectly: after checkout, status poll returns pending and receipt still sent:false)."""
+    r = requests.post(f"{API}/orders", headers=_h(buyer_token), json={
+        "productId": "p-030", "title": "TEST Receipt Checkout",
+        "sellerName": "x", "price": 5.0, "priceLabel": "$5",
+    }, timeout=15)
+    oid = r.json()["id"]
+    c = requests.post(f"{API}/payments/checkout", headers=_h(buyer_token),
+                      json={"order_id": oid, "origin_url": "https://example.com"}, timeout=30)
+    assert c.status_code == 200
+    sid = c.json()["session_id"]
+    # Poll status - not paid yet in test card scenario without UI completion
+    s = requests.get(f"{API}/payments/status/{sid}", timeout=30)
+    assert s.status_code == 200
+    # Receipt still sent:false because payment not completed
+    rc = requests.get(f"{API}/orders/{oid}/receipt", headers=_h(buyer_token), timeout=10)
+    assert rc.status_code == 200
+    assert rc.json()["sent"] is False
+
